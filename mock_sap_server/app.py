@@ -77,6 +77,30 @@ def dashboard():
         )
 
 
+# ---- Dashboard JSON API (for live refresh without page reload) -----------
+@app.route("/api/dashboard")
+def dashboard_api():
+    with _lock:
+        partners = list(_data["BusinessPartners"].values())
+        invoices = list(_data["Invoices"].values())
+        for inv in invoices:
+            inv["Status"] = _compute_invoice_status(inv)
+        sales_orders = list(_data["SalesOrders"].values())
+        materials = list(_data["Materials"].values())
+    return jsonify({
+        "stats": {
+            "BusinessPartners": len(partners),
+            "Invoices": len(invoices),
+            "SalesOrders": len(sales_orders),
+            "Materials": len(materials),
+        },
+        "partners": partners,
+        "invoices": invoices,
+        "sales_orders": sales_orders,
+        "materials": materials,
+    })
+
+
 # ---- Health ---------------------------------------------------------------
 @app.route("/health")
 def health():
