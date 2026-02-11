@@ -56,13 +56,35 @@ async def before_agent_callback(callback_context):
 
 
 # ---------------------------------------------------------------------------
-# Before-tool callback — logs tool invocation
+# Tools that require HITL confirmation before execution
+# ---------------------------------------------------------------------------
+_DESTRUCTIVE_TOOLS = {"delete_record", "delete_by_filter", "reset_all_data"}
+
+
+def _confirmation_hint(tool_name: str, args: dict) -> str:
+    """Build a user-friendly confirmation hint for destructive tools."""
+    if tool_name == "delete_record":
+        return f"⚠️ Delete {args.get('entity_type', '?')} record '{args.get('record_id', '?')}'? This cannot be undone."
+    elif tool_name == "delete_by_filter":
+        filt = args.get("filter_expression", "")
+        desc = f" matching '{filt}'" if filt else " (ALL records)"
+        return f"⚠️ Delete {args.get('entity_type', '?')} records{desc}? This cannot be undone."
+    elif tool_name == "reset_all_data":
+        return "🚨 This will DELETE ALL data (Business Partners, Invoices, Sales Orders, Materials). Are you sure?"
+    return "Confirm this action?"
+
+
+# ---------------------------------------------------------------------------
+# Before-tool callback — logs tool invocation + HITL for destructive tools
 # ---------------------------------------------------------------------------
 async def before_tool_callback(tool, args, tool_context):
     """Called before every tool execution.
 
-    Logs the tool name and arguments so the dashboard shows what the
-    agent is about to do.
+    Two responsibilities:
+    1. Log the tool call to the dashboard event feed.
+    2. For destructive tools (delete/reset), request user confirmation
+       via ADK's native HITL mechanism. Returns a short-circuit dict
+       to prevent the tool from running until the user approves.
     """
     tool_name = tool.name if hasattr(tool, 'name') else str(tool)
     agent_name = tool_context.agent_name if hasattr(tool_context, 'agent_name') else "unknown"
@@ -84,7 +106,40 @@ async def before_tool_callback(tool, args, tool_context):
         "args": display_args,
         "icon": _agent_icon(agent_name),
     })
-    return None  # let the tool proceed
+
+    # HITL: For destructive tools, request confirmation before executing
+    if tool_name in _DESTRUCTIVE_TOOLS:
+        # Check if user has already confirmed this call
+        if tool_context.tool_confirmation and tool_context.tool_confirmation.confirmed:
+            # User approved — let the tool run
+            _emit_event({
+                "event_type": "tool_confirmed",
+                "agent_name": agent_name,
+                "tool_name": tool_name,
+                "icon": "✅",
+            })
+            return None  # proceed with the tool
+
+        # Not yet confirmed — request user approval
+        hint = _confirmation_hint(tool_name, args or {})
+        tool_context.request_confirmation(
+            hint=hint,
+            payload={"tool_name": tool_name, "args": args},
+        )
+
+        _emit_event({
+            "event_type": "confirmation_requested",
+            "agent_name": agent_name,
+            "tool_name": tool_name,
+            "hint": hint,
+            "icon": "⏳",
+        })
+
+        # Short-circuit: return None so ADK uses the confirmation event
+        # instead of calling the tool
+        return None
+
+    return None  # non-destructive tool — proceed normally
 
 
 # ---------------------------------------------------------------------------

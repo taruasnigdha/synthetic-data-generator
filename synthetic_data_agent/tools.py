@@ -512,8 +512,8 @@ def delete_record(
     Use this to remove records the user doesn't want, e.g. if they
     don't like the generated data and want to regenerate it.
 
-    IMPORTANT: This is a destructive operation. Only call this when
-    the user explicitly asks to delete records.
+    IMPORTANT: This is a destructive operation — the agent will ask
+    for user confirmation before this tool executes.
 
     Args:
         entity_type: The entity to delete from. Must be one of:
@@ -553,8 +553,8 @@ def delete_by_filter(
     Use this to bulk-delete records, e.g. "delete all overdue invoices"
     or "delete all invoices for partner BP0000000001".
 
-    IMPORTANT: This is a destructive operation. Only call this when
-    the user explicitly asks to delete records.
+    IMPORTANT: This is a destructive operation — the agent will ask
+    for user confirmation before this tool executes.
 
     Args:
         entity_type: The entity type to delete from. Must be one of:
@@ -593,7 +593,10 @@ def reset_all_data() -> dict:
     This is the nuclear option. Only use when the user explicitly asks
     to start fresh or clear everything.
 
-    IMPORTANT: This deletes ALL Business Partners, Invoices, Sales Orders,
+    IMPORTANT: This is a destructive operation — the agent will ask
+    for user confirmation before this tool executes.
+
+    This deletes ALL Business Partners, Invoices, Sales Orders,
     and Materials. This cannot be undone.
 
     Returns:
