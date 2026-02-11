@@ -21,22 +21,46 @@ def _url(path: str) -> str:
     return f"{MOCK_SAP_URL}{path}"
 
 
+def _safe_request(method: str, path: str, **kwargs) -> dict:
+    """Execute an HTTP request with structured error handling.
+
+    Returns the parsed JSON on success, or a structured error dict
+    that the agent can reason about and recover from.
+    """
+    kwargs.setdefault("timeout", 10)
+    try:
+        resp = getattr(requests, method)(_url(path), **kwargs)
+        resp.raise_for_status()
+        return resp.json()
+    except requests.exceptions.Timeout:
+        return {"status": "error", "message": f"Request to {path} timed out after {kwargs['timeout']}s. Retry or check the server."}
+    except requests.exceptions.ConnectionError:
+        return {"status": "error", "message": f"Cannot connect to SAP server at {MOCK_SAP_URL}. Is the mock server running?"}
+    except requests.exceptions.HTTPError as e:
+        detail = ""
+        try:
+            detail = e.response.json().get("error", {}).get("message", e.response.text[:200])
+        except Exception:
+            detail = e.response.text[:200] if e.response.text else str(e)
+        return {"status": "error", "message": f"SAP API error ({e.response.status_code}): {detail}"}
+    except Exception as e:
+        return {"status": "error", "message": f"Unexpected error: {str(e)[:200]}"}
+
+
 def _post(path: str, data: dict) -> dict:
-    resp = requests.post(_url(path), json=data, timeout=10)
-    resp.raise_for_status()
-    return resp.json()
+    return _safe_request("post", path, json=data)
 
 
 def _patch(path: str, data: dict) -> dict:
-    resp = requests.patch(_url(path), json=data, timeout=10)
-    resp.raise_for_status()
-    return resp.json()
+    return _safe_request("patch", path, json=data)
 
 
 def _get(path: str, params: dict | None = None) -> dict:
-    resp = requests.get(_url(path), params=params or {}, timeout=10)
-    resp.raise_for_status()
-    return resp.json()
+    return _safe_request("get", path, params=params or {})
+
+
+def _delete(path: str) -> dict:
+    return _safe_request("delete", path)
 
 
 # ---------------------------------------------------------------------------
@@ -453,6 +477,8 @@ def read_records(
         params["$filter"] = filter_expression
 
     result = _get(path, params)
+    if result.get("status") == "error":
+        return result
     records = result.get("d", {}).get("results", [])
     return {
         "entity_type": entity_type,
@@ -460,3 +486,124 @@ def read_records(
         "count": len(records),
         "records": records,
     }
+
+
+# ---------------------------------------------------------------------------
+# Path map shared by read/delete tools
+# ---------------------------------------------------------------------------
+_ENTITY_PATH_MAP = {
+    "BusinessPartner": ("/sap/opu/odata/sap/API_BUSINESS_PARTNER/A_BusinessPartner", "BusinessPartner"),
+    "Invoice": ("/sap/opu/odata/sap/API_BILLING_DOCUMENT/A_BillingDocument", "BillingDocument"),
+    "SalesOrder": ("/sap/opu/odata/sap/API_SALES_ORDER_SRV/A_SalesOrder", "SalesOrder"),
+    "Material": ("/sap/opu/odata/sap/API_PRODUCT_SRV/A_Product", "Product"),
+}
+
+
+# ---------------------------------------------------------------------------
+# Tool 9 — Delete a Single Record
+# ---------------------------------------------------------------------------
+
+def delete_record(
+    entity_type: str,
+    record_id: str,
+) -> dict:
+    """Delete a single record from the SAP system.
+
+    Use this to remove records the user doesn't want, e.g. if they
+    don't like the generated data and want to regenerate it.
+
+    IMPORTANT: This is a destructive operation. Only call this when
+    the user explicitly asks to delete records.
+
+    Args:
+        entity_type: The entity to delete from. Must be one of:
+            'BusinessPartner', 'Invoice', 'SalesOrder', 'Material'.
+        record_id: The ID of the record to delete
+            (e.g. 'BP0000000001', 'INV1A2B3C4D', 'SO1A2B3C4D', 'MAT1A2B3C4D').
+
+    Returns:
+        Dict confirming the deletion or an error message.
+    """
+    entry = _ENTITY_PATH_MAP.get(entity_type)
+    if not entry:
+        return {"status": "error", "message": f"Unknown entity_type '{entity_type}'. Use one of: {list(_ENTITY_PATH_MAP.keys())}"}
+
+    path, _ = entry
+    result = _delete(f"{path}('{record_id}')")
+    if result.get("status") == "error":
+        return result
+    return {
+        "status": "success",
+        "message": f"Deleted {entity_type} record '{record_id}'",
+        "entity_type": entity_type,
+        "record_id": record_id,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Tool 10 — Delete Records by Filter
+# ---------------------------------------------------------------------------
+
+def delete_by_filter(
+    entity_type: str,
+    filter_expression: str = "",
+) -> dict:
+    """Delete multiple records matching a filter from the SAP system.
+
+    Use this to bulk-delete records, e.g. "delete all overdue invoices"
+    or "delete all invoices for partner BP0000000001".
+
+    IMPORTANT: This is a destructive operation. Only call this when
+    the user explicitly asks to delete records.
+
+    Args:
+        entity_type: The entity type to delete from. Must be one of:
+            'BusinessPartner', 'Invoice', 'SalesOrder', 'Material'.
+        filter_expression: Optional OData $filter expression to select records.
+            Examples:
+            - "BusinessPartner eq 'BP0000000001'"
+            - "Status eq 'Overdue'"
+            Leave empty to delete ALL records of this type.
+
+    Returns:
+        Dict with the count and IDs of deleted records.
+    """
+    if entity_type not in _ENTITY_PATH_MAP:
+        return {"status": "error", "message": f"Unknown entity_type '{entity_type}'. Use one of: {list(_ENTITY_PATH_MAP.keys())}"}
+
+    payload = {"entity_type": entity_type, "filter": filter_expression}
+    result = _post("/admin/bulk-delete", payload)
+    if result.get("status") == "error":
+        return result
+    return {
+        "status": "success",
+        "message": result.get("message", "Records deleted"),
+        "deleted_count": result.get("deleted_count", 0),
+        "deleted_ids": result.get("deleted_ids", []),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Tool 11 — Reset All Data
+# ---------------------------------------------------------------------------
+
+def reset_all_data() -> dict:
+    """Reset ALL data in the SAP system — removes every record of every type.
+
+    This is the nuclear option. Only use when the user explicitly asks
+    to start fresh or clear everything.
+
+    IMPORTANT: This deletes ALL Business Partners, Invoices, Sales Orders,
+    and Materials. This cannot be undone.
+
+    Returns:
+        Dict confirming the reset.
+    """
+    result = _post("/admin/reset", {})
+    if result.get("status") == "error":
+        return result
+    return {
+        "status": "success",
+        "message": "All SAP data has been reset. The system is now empty.",
+    }
+
