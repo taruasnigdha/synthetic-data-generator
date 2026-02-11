@@ -461,6 +461,26 @@
             font-weight: 600;
             margin-right: 4px;
         }
+
+        .event-type.confirmed {
+            background: rgba(52, 211, 153, 0.15);
+            color: var(--green);
+        }
+
+        .event-type.pending {
+            background: rgba(251, 191, 36, 0.15);
+            color: var(--yellow);
+        }
+
+        .event-body .confirm-hint {
+            margin-top: 6px;
+            padding: 8px 12px;
+            background: rgba(251, 191, 36, 0.08);
+            border: 1px solid rgba(251, 191, 36, 0.2);
+            border-radius: 6px;
+            font-size: 13px;
+            color: var(--yellow);
+        }
     </style>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link
@@ -745,6 +765,20 @@
             'synthetic_data_fabricator': 'Orchestrator',
         };
 
+        const toolDescriptions = {
+            'generate_synthetic_data': 'Generating realistic SAP dataset',
+            'create_business_partner': 'Creating a new business partner in SAP',
+            'set_credit_limit': 'Setting credit limit for business partner',
+            'create_invoice': 'Creating a billing document / invoice',
+            'adjust_invoice_date': 'Adjusting invoice due date for aging',
+            'create_sales_order': 'Creating a sales order document',
+            'create_material': 'Creating a material / product record',
+            'read_records': 'Reading records from SAP for verification',
+            'delete_record': 'Deleting a single record from SAP',
+            'delete_by_filter': 'Bulk-deleting records by filter criteria',
+            'reset_all_data': 'Resetting all SAP data (nuclear option)',
+        };
+
         function renderEvent(ev) {
             const agentLabel = agentNames[ev.agent_name] || ev.agent_name;
             const icon = ev.icon || '🤖';
@@ -761,13 +795,21 @@
             } else if (ev.event_type === 'tool_completed') {
                 typeClass = ev.status === 'error' ? 'error' : 'completed';
                 typeLabel = ev.status === 'error' ? 'ERROR' : 'DONE';
+            } else if (ev.event_type === 'confirmation_requested') {
+                typeClass = 'pending';
+                typeLabel = '⏳ AWAITING APPROVAL';
+            } else if (ev.event_type === 'tool_confirmed') {
+                typeClass = 'confirmed';
+                typeLabel = '✅ APPROVED';
             }
 
             let body = '';
             if (ev.event_type === 'agent_activated') {
                 body = `<em>Agent activated — ready to process</em>`;
             } else if (ev.event_type === 'tool_called') {
+                const desc = toolDescriptions[ev.tool_name] || '';
                 body = `<span class="tool-name">${ev.tool_name}</span>`;
+                if (desc) body += ` — <em>${desc}</em>`;
                 if (ev.args && Object.keys(ev.args).length) {
                     const argsHtml = Object.entries(ev.args)
                         .map(([k, v]) => `<strong>${k}:</strong> ${v}`)
@@ -790,6 +832,13 @@
                 if (ev.duration_ms != null) {
                     body += `<div class="duration">⏱ ${ev.duration_ms}ms</div>`;
                 }
+            } else if (ev.event_type === 'confirmation_requested') {
+                body = `<span class="tool-name">${ev.tool_name}</span>`;
+                if (ev.hint) {
+                    body += `<div class="confirm-hint">${ev.hint}</div>`;
+                }
+            } else if (ev.event_type === 'tool_confirmed') {
+                body = `<span class="tool-name">${ev.tool_name}</span> — <em>User approved, proceeding with execution</em>`;
             }
 
             return `<div class="event-card agent-${ev.agent_name}">
