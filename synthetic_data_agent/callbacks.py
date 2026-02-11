@@ -122,11 +122,11 @@ async def before_tool_callback(tool, args, tool_context):
 
         # Not yet confirmed — request user approval
         hint = _confirmation_hint(tool_name, args or {})
-        tool_context.request_confirmation(
+        confirmation_event = tool_context.request_confirmation(
             hint=hint,
             payload={"tool_name": tool_name, "args": args},
         )
-
+        
         _emit_event({
             "event_type": "confirmation_requested",
             "agent_name": agent_name,
@@ -135,9 +135,9 @@ async def before_tool_callback(tool, args, tool_context):
             "icon": "⏳",
         })
 
-        # Short-circuit: return None so ADK uses the confirmation event
+        # Short-circuit: return the confirmation event so ADK uses it
         # instead of calling the tool
-        return None
+        return confirmation_event
 
     return None  # non-destructive tool — proceed normally
 
