@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SAP Mock Server — Dashboard</title>
+    <style>
+        :root {
+            --bg: #0f1117;
+            --surface: #1a1d27;
+            --surface-hover: #22263a;
+            --border: #2a2e3f;
+            --text: #e4e6f0;
+            --text-muted: #8b8fa3;
+            --accent: #4f8cff;
+            --accent-glow: rgba(79,140,255,0.15);
+            --green: #34d399;
+            --red: #f87171;
+            --yellow: #fbbf24;
+            --orange: #fb923c;
+            --radius: 12px;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+        /* ---- Header ---- */
+        header {
+            background: linear-gradient(135deg, #141728 0%, #1e2240 100%);
+            border-bottom: 1px solid var(--border);
+            padding: 20px 32px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        header .logo {
+            width: 40px; height: 40px;
+            background: linear-gradient(135deg, var(--accent), #7c3aed);
+            border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            font-weight: 800; font-size: 18px; color: #fff;
+        }
+        header h1 { font-size: 20px; font-weight: 700; }
+        header .subtitle { color: var(--text-muted); font-size: 13px; margin-left: auto; }
+        header .live-dot {
+            width: 8px; height: 8px; border-radius: 50%;
+            background: var(--green);
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        /* ---- Stats ---- */
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            padding: 24px 32px;
+        }
+        .stat-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 20px;
+            transition: border-color 0.2s;
+        }
+        .stat-card:hover { border-color: var(--accent); }
+        .stat-card .label { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+        .stat-card .value { font-size: 32px; font-weight: 800; margin-top: 4px; }
+        .stat-card.bp .value { color: var(--accent); }
+        .stat-card.inv .value { color: var(--orange); }
+        .stat-card.so .value { color: var(--green); }
+        .stat-card.mat .value { color: var(--yellow); }
+
+        /* ---- Tabs ---- */
+        .tabs {
+            display: flex;
+            gap: 4px;
+            padding: 0 32px;
+            border-bottom: 1px solid var(--border);
+        }
+        .tab {
+            padding: 12px 20px;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-muted);
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+            background: none;
+            border-top: none; border-left: none; border-right: none;
+        }
+        .tab:hover { color: var(--text); }
+        .tab.active {
+            color: var(--accent);
+            border-bottom-color: var(--accent);
+        }
+        .tab .badge {
+            display: inline-block;
+            background: var(--accent-glow);
+            color: var(--accent);
+            font-size: 11px;
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 20px;
+            margin-left: 6px;
+        }
+
+        /* ---- Table ---- */
+        .table-wrap {
+            padding: 20px 32px;
+        }
+        .panel { display: none; }
+        .panel.active { display: block; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+        thead th {
+            text-align: left;
+            padding: 10px 14px;
+            color: var(--text-muted);
+            font-weight: 600;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            border-bottom: 1px solid var(--border);
+        }
+        tbody tr {
+            border-bottom: 1px solid var(--border);
+            transition: background 0.15s;
+        }
+        tbody tr:hover { background: var(--surface-hover); }
+        tbody td {
+            padding: 12px 14px;
+            font-family: 'JetBrains Mono', 'Fira Code', monospace;
+        }
+        .status {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 700;
+        }
+        .status-Overdue { background: rgba(248,113,113,0.15); color: var(--red); }
+        .status-Open { background: rgba(251,191,36,0.15); color: var(--yellow); }
+        .status-Paid { background: rgba(52,211,153,0.15); color: var(--green); }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-muted);
+        }
+        .empty-state .icon { font-size: 48px; margin-bottom: 12px; }
+        .empty-state p { font-size: 14px; }
+
+        /* ---- Auto-refresh bar ---- */
+        .refresh-bar {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            padding: 8px 32px;
+            gap: 8px;
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+        .refresh-bar button {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 6px 14px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: border-color 0.2s;
+        }
+        .refresh-bar button:hover { border-color: var(--accent); }
+    </style>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<header>
+    <div class="logo">S</div>
+    <div>
+        <h1>SAP Mock Server</h1>
+    </div>
+    <span class="subtitle">OData Simulation Engine</span>
+    <div class="live-dot" title="Server Running"></div>
+</header>
+
+<!-- Stats -->
+<div class="stats">
+    <div class="stat-card bp">
+        <div class="label">Business Partners</div>
+        <div class="value" id="stat-bp">{{ stats.BusinessPartners }}</div>
+    </div>
+    <div class="stat-card inv">
+        <div class="label">Invoices</div>
+        <div class="value" id="stat-inv">{{ stats.Invoices }}</div>
+    </div>
+    <div class="stat-card so">
+        <div class="label">Sales Orders</div>
+        <div class="value" id="stat-so">{{ stats.SalesOrders }}</div>
+    </div>
+    <div class="stat-card mat">
+        <div class="label">Materials</div>
+        <div class="value" id="stat-mat">{{ stats.Materials }}</div>
+    </div>
+</div>
+
+<!-- Refresh -->
+<div class="refresh-bar">
+    <span id="last-refresh">Last refreshed: just now</span>
+    <button onclick="location.reload()">⟳ Refresh</button>
+</div>
+
+<!-- Tabs -->
+<div class="tabs">
+    <button class="tab active" data-panel="bp-panel">
+        Business Partners <span class="badge">{{ stats.BusinessPartners }}</span>
+    </button>
+    <button class="tab" data-panel="inv-panel">
+        Invoices <span class="badge">{{ stats.Invoices }}</span>
+    </button>
+    <button class="tab" data-panel="so-panel">
+        Sales Orders <span class="badge">{{ stats.SalesOrders }}</span>
+    </button>
+    <button class="tab" data-panel="mat-panel">
+        Materials <span class="badge">{{ stats.Materials }}</span>
+    </button>
+</div>
+
+<!-- Table panels -->
+<div class="table-wrap">
+
+    <!-- Business Partners -->
+    <div class="panel active" id="bp-panel">
+        {% if partners %}
+        <table>
+            <thead>
+                <tr>
+                    <th>BP ID</th>
+                    <th>Name</th>
+                    <th>Type</th>
+                    <th>Country</th>
+                    <th>City</th>
+                    <th>Credit Limit</th>
+                    <th>Created</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for bp in partners %}
+                <tr>
+                    <td>{{ bp.BusinessPartner }}</td>
+                    <td>{{ bp.BusinessPartnerName }}</td>
+                    <td>{{ bp.BusinessPartnerType }}</td>
+                    <td>{{ bp.Country }}</td>
+                    <td>{{ bp.City }}</td>
+                    <td>{{ bp.Currency }} {{ "%.2f"|format(bp.CreditLimit) }}</td>
+                    <td>{{ bp.CreatedAt[:10] }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="empty-state">
+            <div class="icon">🏢</div>
+            <p>No business partners yet. The agent will create them.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Invoices -->
+    <div class="panel" id="inv-panel">
+        {% if invoices %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Invoice ID</th>
+                    <th>Business Partner</th>
+                    <th>Amount</th>
+                    <th>Due Date</th>
+                    <th>Status</th>
+                    <th>Payment</th>
+                    <th>Created</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for inv in invoices %}
+                <tr>
+                    <td>{{ inv.BillingDocument }}</td>
+                    <td>{{ inv.BusinessPartner }}</td>
+                    <td>{{ inv.TransactionCurrency }} {{ "%.2f"|format(inv.TotalNetAmount) }}</td>
+                    <td>{{ inv.DueDate }}</td>
+                    <td><span class="status status-{{ inv.Status }}">{{ inv.Status }}</span></td>
+                    <td>{{ inv.PaymentStatus }}</td>
+                    <td>{{ inv.CreatedAt[:10] }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="empty-state">
+            <div class="icon">📄</div>
+            <p>No invoices yet. The agent will create them.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Sales Orders -->
+    <div class="panel" id="so-panel">
+        {% if sales_orders %}
+        <table>
+            <thead>
+                <tr>
+                    <th>SO ID</th>
+                    <th>Business Partner</th>
+                    <th>Type</th>
+                    <th>Amount</th>
+                    <th>Delivery Date</th>
+                    <th>Status</th>
+                    <th>Created</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for so in sales_orders %}
+                <tr>
+                    <td>{{ so.SalesOrder }}</td>
+                    <td>{{ so.BusinessPartner }}</td>
+                    <td>{{ so.SalesOrderType }}</td>
+                    <td>{{ so.TransactionCurrency }} {{ "%.2f"|format(so.TotalNetAmount) }}</td>
+                    <td>{{ so.RequestedDeliveryDate }}</td>
+                    <td><span class="status status-{{ so.OverallStatus }}">{{ so.OverallStatus }}</span></td>
+                    <td>{{ so.CreatedAt[:10] }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="empty-state">
+            <div class="icon">📦</div>
+            <p>No sales orders yet. The agent will create them.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Materials -->
+    <div class="panel" id="mat-panel">
+        {% if materials %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Material ID</th>
+                    <th>Name</th>
+                    <th>Type</th>
+                    <th>Unit</th>
+                    <th>Price</th>
+                    <th>Group</th>
+                    <th>Created</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for m in materials %}
+                <tr>
+                    <td>{{ m.Product }}</td>
+                    <td>{{ m.ProductName }}</td>
+                    <td>{{ m.ProductType }}</td>
+                    <td>{{ m.BaseUnit }}</td>
+                    <td>{{ m.Currency }} {{ "%.2f"|format(m.StandardPrice) }}</td>
+                    <td>{{ m.ProductGroup }}</td>
+                    <td>{{ m.CreatedAt[:10] }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="empty-state">
+            <div class="icon">🔧</div>
+            <p>No materials yet. The agent will create them.</p>
+        </div>
+        {% endif %}
+    </div>
+
+</div>
+
+<script>
+    // Tab switching
+    document.querySelectorAll('.tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+            tab.classList.add('active');
+            document.getElementById(tab.dataset.panel).classList.add('active');
+        });
+    });
+
+    // Auto-refresh every 5 seconds
+    let countdown = 5;
+    const refreshEl = document.getElementById('last-refresh');
+    setInterval(() => {
+        countdown--;
+        if (countdown <= 0) {
+            location.reload();
+        } else {
+            refreshEl.textContent = `Auto-refresh in ${countdown}s`;
+        }
+    }, 1000);
+</script>
+
+</body>
+</html>
