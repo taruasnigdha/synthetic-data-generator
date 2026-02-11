@@ -345,6 +345,122 @@ def update_material(mat_id):
 
 
 # ===========================================================================
+#  DELETE endpoints
+# ===========================================================================
+
+@app.route(f"{BP_BASE}/A_BusinessPartner('<bp_id>')", methods=["DELETE"])
+def delete_partner(bp_id):
+    with _lock:
+        partner = _data["BusinessPartners"].pop(bp_id, None)
+    if not partner:
+        return jsonify({"error": {"message": f"Business Partner '{bp_id}' not found"}}), 404
+    return jsonify({"d": partner, "message": f"Business Partner '{bp_id}' deleted"})
+
+
+@app.route(f"{INV_BASE}/A_BillingDocument('<inv_id>')", methods=["DELETE"])
+def delete_invoice(inv_id):
+    with _lock:
+        invoice = _data["Invoices"].pop(inv_id, None)
+    if not invoice:
+        return jsonify({"error": {"message": f"Invoice '{inv_id}' not found"}}), 404
+    return jsonify({"d": invoice, "message": f"Invoice '{inv_id}' deleted"})
+
+
+@app.route(f"{SO_BASE}/A_SalesOrder('<so_id>')", methods=["DELETE"])
+def delete_sales_order(so_id):
+    with _lock:
+        order = _data["SalesOrders"].pop(so_id, None)
+    if not order:
+        return jsonify({"error": {"message": f"Sales Order '{so_id}' not found"}}), 404
+    return jsonify({"d": order, "message": f"Sales Order '{so_id}' deleted"})
+
+
+@app.route(f"{MAT_BASE}/A_Product('<mat_id>')", methods=["DELETE"])
+def delete_material(mat_id):
+    with _lock:
+        material = _data["Materials"].pop(mat_id, None)
+    if not material:
+        return jsonify({"error": {"message": f"Product '{mat_id}' not found"}}), 404
+    return jsonify({"d": material, "message": f"Product '{mat_id}' deleted"})
+
+
+@app.route("/admin/bulk-delete", methods=["POST"])
+def bulk_delete():
+    """Delete records matching an entity type and optional filter."""
+    body = request.get_json(force=True)
+    entity_type = body.get("entity_type", "")
+    filter_expr = body.get("filter", "")
+    store_key_map = {
+        "BusinessPartner": "BusinessPartners",
+        "Invoice": "Invoices",
+        "SalesOrder": "SalesOrders",
+        "Material": "Materials",
+    }
+    store_key = store_key_map.get(entity_type)
+    if not store_key:
+        return jsonify({"error": {"message": f"Unknown entity_type '{entity_type}'"}}), 400
+
+    with _lock:
+        records = list(_data[store_key].values())
+        to_delete = _apply_filter(records, filter_expr) if filter_expr else records
+        id_field_map = {
+            "BusinessPartners": "BusinessPartner",
+            "Invoices": "BillingDocument",
+            "SalesOrders": "SalesOrder",
+            "Materials": "Product",
+        }
+        id_field = id_field_map[store_key]
+        deleted_ids = []
+        for rec in to_delete:
+            rec_id = rec.get(id_field)
+            if rec_id and rec_id in _data[store_key]:
+                del _data[store_key][rec_id]
+                deleted_ids.append(rec_id)
+
+    return jsonify({
+        "message": f"Deleted {len(deleted_ids)} {entity_type} records",
+        "deleted_count": len(deleted_ids),
+        "deleted_ids": deleted_ids,
+    })
+
+
+# ===========================================================================
+#  Agent Event Log (for live Agent Activity dashboard)
+# ===========================================================================
+_agent_events = []  # in-memory log of agent activity events
+
+
+@app.route("/api/agent-events", methods=["POST"])
+def post_agent_event():
+    """Receives agent activity events from callbacks."""
+    event = request.get_json(force=True)
+    with _lock:
+        _agent_events.append(event)
+        # Keep last 200 events to prevent unbounded growth
+        if len(_agent_events) > 200:
+            _agent_events.pop(0)
+    return jsonify({"status": "ok"}), 201
+
+
+@app.route("/api/agent-events", methods=["GET"])
+def get_agent_events():
+    """Returns the agent event log for the dashboard."""
+    since = request.args.get("since", 0, type=int)
+    with _lock:
+        events = _agent_events[since:]
+        total = len(_agent_events)
+    return jsonify({"events": events, "total": total, "from_index": since})
+
+
+@app.route("/api/agent-events", methods=["DELETE"])
+def clear_agent_events():
+    """Clear the agent event log."""
+    with _lock:
+        _agent_events.clear()
+    return jsonify({"message": "Agent events cleared"})
+
+
+# ===========================================================================
 #  Reset endpoint (for testing)
 # ===========================================================================
 @app.route("/admin/reset", methods=["POST"])
@@ -354,6 +470,7 @@ def reset_data():
         for key in _data:
             _data[key].clear()
         _bp_counter = 0
+        _agent_events.clear()
     return jsonify({"message": "All data reset"})
 
 
@@ -388,3 +505,4 @@ def _apply_filter(records: list, filter_str: str | None) -> list:
 # ===========================================================================
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8080, debug=True)
+

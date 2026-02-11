@@ -19,6 +19,8 @@
             --red: #f87171;
             --yellow: #fbbf24;
             --orange: #fb923c;
+            --purple: #a78bfa;
+            --teal: #2dd4bf;
             --radius: 12px;
         }
 
@@ -287,6 +289,178 @@
         .refresh-bar button:hover {
             border-color: var(--accent);
         }
+
+        /* ---- Agent Activity Feed ---- */
+        .agent-feed {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            max-height: 65vh;
+            overflow-y: auto;
+            padding-right: 8px;
+        }
+
+        .agent-feed::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .agent-feed::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .agent-feed::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 3px;
+        }
+
+        .event-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 14px 18px;
+            border-left: 3px solid var(--accent);
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .event-card.agent-orchestrator {
+            border-left-color: var(--purple);
+        }
+
+        .event-card.agent-data_generation_agent {
+            border-left-color: var(--accent);
+        }
+
+        .event-card.agent-business_partner_agent {
+            border-left-color: var(--orange);
+        }
+
+        .event-card.agent-transaction_agent {
+            border-left-color: var(--green);
+        }
+
+        .event-card.agent-verification_agent {
+            border-left-color: var(--teal);
+        }
+
+        .event-card.agent-cleanup_agent {
+            border-left-color: var(--red);
+        }
+
+        .event-card.agent-synthetic_data_fabricator {
+            border-left-color: var(--purple);
+        }
+
+        .event-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 6px;
+        }
+
+        .event-icon {
+            font-size: 18px;
+        }
+
+        .event-agent {
+            font-weight: 700;
+            font-size: 13px;
+        }
+
+        .event-type {
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 20px;
+            font-weight: 600;
+            margin-left: auto;
+        }
+
+        .event-type.activated {
+            background: rgba(167, 139, 250, 0.15);
+            color: var(--purple);
+        }
+
+        .event-type.called {
+            background: rgba(79, 140, 255, 0.15);
+            color: var(--accent);
+        }
+
+        .event-type.completed {
+            background: rgba(52, 211, 153, 0.15);
+            color: var(--green);
+        }
+
+        .event-type.error {
+            background: rgba(248, 113, 113, 0.15);
+            color: var(--red);
+        }
+
+        .event-time {
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        .event-body {
+            font-size: 13px;
+            color: var(--text-muted);
+            font-family: 'JetBrains Mono', monospace;
+            line-height: 1.5;
+        }
+
+        .event-body .tool-name {
+            color: var(--accent);
+            font-weight: 600;
+        }
+
+        .event-body .tool-args {
+            margin-top: 4px;
+            padding: 6px 10px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 6px;
+            font-size: 12px;
+            word-break: break-all;
+        }
+
+        .event-body .result-msg {
+            margin-top: 4px;
+            color: var(--green);
+        }
+
+        .event-body .result-msg.err {
+            color: var(--red);
+        }
+
+        .event-body .duration {
+            color: var(--text-muted);
+            font-size: 11px;
+            margin-top: 2px;
+        }
+
+        .event-body .ids-list {
+            margin-top: 4px;
+        }
+
+        .event-body .ids-list span {
+            display: inline-block;
+            background: var(--accent-glow);
+            color: var(--accent);
+            padding: 1px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            margin-right: 4px;
+        }
     </style>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link
@@ -301,7 +475,7 @@
         <div>
             <h1>SAP Mock Server</h1>
         </div>
-        <span class="subtitle">OData Simulation Engine</span>
+        <span class="subtitle">OData Simulation Engine — Multi-Agent Architecture</span>
         <div class="live-dot" title="Server Running"></div>
     </header>
 
@@ -333,7 +507,10 @@
 
     <!-- Tabs -->
     <div class="tabs">
-        <button class="tab active" data-panel="bp-panel">
+        <button class="tab active" data-panel="activity-panel">
+            🧠 Agent Activity <span class="badge" id="activity-badge">0</span>
+        </button>
+        <button class="tab" data-panel="bp-panel">
             Business Partners <span class="badge">{{ stats.BusinessPartners }}</span>
         </button>
         <button class="tab" data-panel="inv-panel">
@@ -350,8 +527,18 @@
     <!-- Table panels -->
     <div class="table-wrap">
 
+        <!-- Agent Activity (default) -->
+        <div class="panel active" id="activity-panel">
+            <div class="agent-feed" id="agent-feed">
+                <div class="empty-state" id="activity-empty">
+                    <div class="icon">🧠</div>
+                    <p>Waiting for agent activity… Run the agent to see live reasoning here.</p>
+                </div>
+            </div>
+        </div>
+
         <!-- Business Partners -->
-        <div class="panel active" id="bp-panel">
+        <div class="panel" id="bp-panel">
             {% if partners %}
             <table>
                 <thead>
@@ -501,87 +688,184 @@
     </div>
 
     <script>
-    // Tab switching — persists selection across refreshes
-    let activePanel = 'bp-panel';
-    document.querySelectorAll('.tab').forEach(tab => {
-        tab.addEventListener('click', () => {
-            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-            document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-            tab.classList.add('active');
-            activePanel = tab.dataset.panel;
-            document.getElementById(activePanel).classList.add('active');
+        // Tab switching — persists selection across refreshes
+        let activePanel = 'activity-panel';
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+                tab.classList.add('active');
+                activePanel = tab.dataset.panel;
+                document.getElementById(activePanel).classList.add('active');
+            });
         });
-    });
 
-    // ---- Helper: build table rows ----
-    function bpRows(records) {
-        if (!records.length) return `<div class="empty-state"><div class="icon">🏢</div><p>No business partners yet.</p></div>`;
-        let h = `<table><thead><tr><th>BP ID</th><th>Name</th><th>Type</th><th>Country</th><th>City</th><th>Credit Limit</th><th>Created</th></tr></thead><tbody>`;
-        records.forEach(r => {
-            h += `<tr><td>${r.BusinessPartner}</td><td>${r.BusinessPartnerName}</td><td>${r.BusinessPartnerType}</td><td>${r.Country}</td><td>${r.City}</td><td>${r.Currency} ${Number(r.CreditLimit).toFixed(2)}</td><td>${(r.CreatedAt||'').slice(0,10)}</td></tr>`;
-        });
-        return h + `</tbody></table>`;
-    }
-    function invRows(records) {
-        if (!records.length) return `<div class="empty-state"><div class="icon">📄</div><p>No invoices yet.</p></div>`;
-        let h = `<table><thead><tr><th>Invoice ID</th><th>Business Partner</th><th>Amount</th><th>Due Date</th><th>Status</th><th>Payment</th><th>Created</th></tr></thead><tbody>`;
-        records.forEach(r => {
-            h += `<tr><td>${r.BillingDocument}</td><td>${r.BusinessPartner}</td><td>${r.TransactionCurrency} ${Number(r.TotalNetAmount).toFixed(2)}</td><td>${r.DueDate}</td><td><span class="status status-${r.Status}">${r.Status}</span></td><td>${r.PaymentStatus}</td><td>${(r.CreatedAt||'').slice(0,10)}</td></tr>`;
-        });
-        return h + `</tbody></table>`;
-    }
-    function soRows(records) {
-        if (!records.length) return `<div class="empty-state"><div class="icon">📦</div><p>No sales orders yet.</p></div>`;
-        let h = `<table><thead><tr><th>SO ID</th><th>Business Partner</th><th>Type</th><th>Amount</th><th>Delivery Date</th><th>Status</th><th>Created</th></tr></thead><tbody>`;
-        records.forEach(r => {
-            h += `<tr><td>${r.SalesOrder}</td><td>${r.BusinessPartner}</td><td>${r.SalesOrderType}</td><td>${r.TransactionCurrency} ${Number(r.TotalNetAmount).toFixed(2)}</td><td>${r.RequestedDeliveryDate}</td><td><span class="status status-${r.OverallStatus}">${r.OverallStatus}</span></td><td>${(r.CreatedAt||'').slice(0,10)}</td></tr>`;
-        });
-        return h + `</tbody></table>`;
-    }
-    function matRows(records) {
-        if (!records.length) return `<div class="empty-state"><div class="icon">🔧</div><p>No materials yet.</p></div>`;
-        let h = `<table><thead><tr><th>Material ID</th><th>Name</th><th>Type</th><th>Unit</th><th>Price</th><th>Group</th><th>Created</th></tr></thead><tbody>`;
-        records.forEach(r => {
-            h += `<tr><td>${r.Product}</td><td>${r.ProductName}</td><td>${r.ProductType}</td><td>${r.BaseUnit}</td><td>${r.Currency} ${Number(r.StandardPrice).toFixed(2)}</td><td>${r.ProductGroup}</td><td>${(r.CreatedAt||'').slice(0,10)}</td></tr>`;
-        });
-        return h + `</tbody></table>`;
-    }
-
-    // ---- Live refresh via fetch (preserves tab state) ----
-    const refreshEl = document.getElementById('last-refresh');
-
-    async function refreshData() {
-        try {
-            const resp = await fetch('/api/dashboard');
-            const data = await resp.json();
-
-            // Update stats
-            document.getElementById('stat-bp').textContent = data.stats.BusinessPartners;
-            document.getElementById('stat-inv').textContent = data.stats.Invoices;
-            document.getElementById('stat-so').textContent = data.stats.SalesOrders;
-            document.getElementById('stat-mat').textContent = data.stats.Materials;
-
-            // Update tab badges
-            const tabs = document.querySelectorAll('.tab');
-            tabs[0].querySelector('.badge').textContent = data.stats.BusinessPartners;
-            tabs[1].querySelector('.badge').textContent = data.stats.Invoices;
-            tabs[2].querySelector('.badge').textContent = data.stats.SalesOrders;
-            tabs[3].querySelector('.badge').textContent = data.stats.Materials;
-
-            // Update table contents (tab selection is preserved)
-            document.getElementById('bp-panel').innerHTML = bpRows(data.partners);
-            document.getElementById('inv-panel').innerHTML = invRows(data.invoices);
-            document.getElementById('so-panel').innerHTML = soRows(data.sales_orders);
-            document.getElementById('mat-panel').innerHTML = matRows(data.materials);
-
-            refreshEl.textContent = 'Updated just now';
-        } catch (e) {
-            refreshEl.textContent = 'Refresh failed — retrying…';
+        // ---- Helper: build table rows ----
+        function bpRows(records) {
+            if (!records.length) return `<div class="empty-state"><div class="icon">🏢</div><p>No business partners yet.</p></div>`;
+            let h = `<table><thead><tr><th>BP ID</th><th>Name</th><th>Type</th><th>Country</th><th>City</th><th>Credit Limit</th><th>Created</th></tr></thead><tbody>`;
+            records.forEach(r => {
+                h += `<tr><td>${r.BusinessPartner}</td><td>${r.BusinessPartnerName}</td><td>${r.BusinessPartnerType}</td><td>${r.Country}</td><td>${r.City}</td><td>${r.Currency} ${Number(r.CreditLimit).toFixed(2)}</td><td>${(r.CreatedAt || '').slice(0, 10)}</td></tr>`;
+            });
+            return h + `</tbody></table>`;
         }
-    }
+        function invRows(records) {
+            if (!records.length) return `<div class="empty-state"><div class="icon">📄</div><p>No invoices yet.</p></div>`;
+            let h = `<table><thead><tr><th>Invoice ID</th><th>Business Partner</th><th>Amount</th><th>Due Date</th><th>Status</th><th>Payment</th><th>Created</th></tr></thead><tbody>`;
+            records.forEach(r => {
+                h += `<tr><td>${r.BillingDocument}</td><td>${r.BusinessPartner}</td><td>${r.TransactionCurrency} ${Number(r.TotalNetAmount).toFixed(2)}</td><td>${r.DueDate}</td><td><span class="status status-${r.Status}">${r.Status}</span></td><td>${r.PaymentStatus}</td><td>${(r.CreatedAt || '').slice(0, 10)}</td></tr>`;
+            });
+            return h + `</tbody></table>`;
+        }
+        function soRows(records) {
+            if (!records.length) return `<div class="empty-state"><div class="icon">📦</div><p>No sales orders yet.</p></div>`;
+            let h = `<table><thead><tr><th>SO ID</th><th>Business Partner</th><th>Type</th><th>Amount</th><th>Delivery Date</th><th>Status</th><th>Created</th></tr></thead><tbody>`;
+            records.forEach(r => {
+                h += `<tr><td>${r.SalesOrder}</td><td>${r.BusinessPartner}</td><td>${r.SalesOrderType}</td><td>${r.TransactionCurrency} ${Number(r.TotalNetAmount).toFixed(2)}</td><td>${r.RequestedDeliveryDate}</td><td><span class="status status-${r.OverallStatus}">${r.OverallStatus}</span></td><td>${(r.CreatedAt || '').slice(0, 10)}</td></tr>`;
+            });
+            return h + `</tbody></table>`;
+        }
+        function matRows(records) {
+            if (!records.length) return `<div class="empty-state"><div class="icon">🔧</div><p>No materials yet.</p></div>`;
+            let h = `<table><thead><tr><th>Material ID</th><th>Name</th><th>Type</th><th>Unit</th><th>Price</th><th>Group</th><th>Created</th></tr></thead><tbody>`;
+            records.forEach(r => {
+                h += `<tr><td>${r.Product}</td><td>${r.ProductName}</td><td>${r.ProductType}</td><td>${r.BaseUnit}</td><td>${r.Currency} ${Number(r.StandardPrice).toFixed(2)}</td><td>${r.ProductGroup}</td><td>${(r.CreatedAt || '').slice(0, 10)}</td></tr>`;
+            });
+            return h + `</tbody></table>`;
+        }
 
-    // Refresh every 3 seconds
-    setInterval(refreshData, 3000);
+        // ---- Agent Activity: render event card ----
+        const agentNames = {
+            'orchestrator': 'Orchestrator',
+            'data_generation_agent': 'Data Generation',
+            'business_partner_agent': 'Business Partner',
+            'transaction_agent': 'Transaction',
+            'verification_agent': 'Verification',
+            'cleanup_agent': 'Cleanup',
+            'synthetic_data_fabricator': 'Orchestrator',
+        };
+
+        function renderEvent(ev) {
+            const agentLabel = agentNames[ev.agent_name] || ev.agent_name;
+            const icon = ev.icon || '🤖';
+            const time = ev.timestamp ? new Date(ev.timestamp).toLocaleTimeString() : '';
+            let typeClass = 'called';
+            let typeLabel = ev.event_type;
+
+            if (ev.event_type === 'agent_activated') {
+                typeClass = 'activated';
+                typeLabel = 'ACTIVATED';
+            } else if (ev.event_type === 'tool_called') {
+                typeClass = 'called';
+                typeLabel = 'CALLING';
+            } else if (ev.event_type === 'tool_completed') {
+                typeClass = ev.status === 'error' ? 'error' : 'completed';
+                typeLabel = ev.status === 'error' ? 'ERROR' : 'DONE';
+            }
+
+            let body = '';
+            if (ev.event_type === 'agent_activated') {
+                body = `<em>Agent activated — ready to process</em>`;
+            } else if (ev.event_type === 'tool_called') {
+                body = `<span class="tool-name">${ev.tool_name}</span>`;
+                if (ev.args && Object.keys(ev.args).length) {
+                    const argsHtml = Object.entries(ev.args)
+                        .map(([k, v]) => `<strong>${k}:</strong> ${v}`)
+                        .join('<br>');
+                    body += `<div class="tool-args">${argsHtml}</div>`;
+                }
+            } else if (ev.event_type === 'tool_completed') {
+                body = `<span class="tool-name">${ev.tool_name}</span>`;
+                if (ev.message) {
+                    const msgClass = ev.status === 'error' ? 'result-msg err' : 'result-msg';
+                    body += `<div class="${msgClass}">${ev.status === 'error' ? '✗' : '✓'} ${ev.message}</div>`;
+                }
+                if (ev.ids && Object.keys(ev.ids).length) {
+                    body += `<div class="ids-list">`;
+                    for (const [k, v] of Object.entries(ev.ids)) {
+                        body += `<span>${k}: ${v}</span>`;
+                    }
+                    body += `</div>`;
+                }
+                if (ev.duration_ms != null) {
+                    body += `<div class="duration">⏱ ${ev.duration_ms}ms</div>`;
+                }
+            }
+
+            return `<div class="event-card agent-${ev.agent_name}">
+            <div class="event-header">
+                <span class="event-icon">${icon}</span>
+                <span class="event-agent">${agentLabel}</span>
+                <span class="event-type ${typeClass}">${typeLabel}</span>
+                <span class="event-time">${time}</span>
+            </div>
+            <div class="event-body">${body}</div>
+        </div>`;
+        }
+
+        // ---- Live refresh via fetch (preserves tab state) ----
+        const refreshEl = document.getElementById('last-refresh');
+        let eventCursor = 0;
+
+        async function refreshData() {
+            try {
+                const resp = await fetch('/api/dashboard');
+                const data = await resp.json();
+
+                // Update stats
+                document.getElementById('stat-bp').textContent = data.stats.BusinessPartners;
+                document.getElementById('stat-inv').textContent = data.stats.Invoices;
+                document.getElementById('stat-so').textContent = data.stats.SalesOrders;
+                document.getElementById('stat-mat').textContent = data.stats.Materials;
+
+                // Update tab badges (skip first tab = activity)
+                const tabs = document.querySelectorAll('.tab');
+                tabs[1].querySelector('.badge').textContent = data.stats.BusinessPartners;
+                tabs[2].querySelector('.badge').textContent = data.stats.Invoices;
+                tabs[3].querySelector('.badge').textContent = data.stats.SalesOrders;
+                tabs[4].querySelector('.badge').textContent = data.stats.Materials;
+
+                // Update table contents (tab selection is preserved)
+                document.getElementById('bp-panel').innerHTML = bpRows(data.partners);
+                document.getElementById('inv-panel').innerHTML = invRows(data.invoices);
+                document.getElementById('so-panel').innerHTML = soRows(data.sales_orders);
+                document.getElementById('mat-panel').innerHTML = matRows(data.materials);
+
+                refreshEl.textContent = 'Updated just now';
+            } catch (e) {
+                refreshEl.textContent = 'Refresh failed — retrying…';
+            }
+        }
+
+        async function refreshEvents() {
+            try {
+                const resp = await fetch(`/api/agent-events?since=${eventCursor}`);
+                const data = await resp.json();
+                if (data.events && data.events.length > 0) {
+                    // Hide empty state
+                    const emptyEl = document.getElementById('activity-empty');
+                    if (emptyEl) emptyEl.remove();
+
+                    const feed = document.getElementById('agent-feed');
+                    for (const ev of data.events) {
+                        feed.insertAdjacentHTML('afterbegin', renderEvent(ev));
+                    }
+                    eventCursor = data.total;
+
+                    // Update activity badge
+                    document.getElementById('activity-badge').textContent = data.total;
+
+                    // Auto-scroll to top (newest first)
+                    feed.scrollTop = 0;
+                }
+            } catch (e) { /* ignore */ }
+        }
+
+        // Refresh every 2 seconds
+        setInterval(refreshData, 3000);
+        setInterval(refreshEvents, 1500);
+        // Initial load
+        refreshEvents();
     </script>
 
 </body>
