@@ -1,4 +1,6 @@
 #!/bin/bash
+
+source ~/.zshrc
 PROJECT_ID="ai-connect-sap26blr-337"
 REGION="us-central1"
 SERVICE_NAME="mock-sap-server"
