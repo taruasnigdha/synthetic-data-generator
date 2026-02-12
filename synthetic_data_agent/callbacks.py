@@ -12,10 +12,11 @@ These callbacks make the agent's "thinking" visible:
 """
 
 import time
+import os
 import requests
 from datetime import datetime, timezone
 
-MOCK_SAP_URL = "http://localhost:8080"
+MOCK_SAP_URL = os.getenv("MOCK_SAP_URL", "http://localhost:8080")
 
 
 def _emit_event(event: dict) -> None:
