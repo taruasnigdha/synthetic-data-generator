@@ -1,0 +1,4 @@
+google-cloud-aiplatform[agent_engines,adk]>=1.112
+flask>=3.0.0
+python-dotenv>=1.0.0
+faker>=28.0.0

@@ -6,3 +6,4 @@ __pycache__/
 dist/
 build/
 .pytest_cache/
+synthetic_data_agent/.adk/*

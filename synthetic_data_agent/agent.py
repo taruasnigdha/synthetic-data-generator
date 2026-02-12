@@ -277,6 +277,7 @@ Your reasoning and plan should be:
 Always explain your reasoning step by step before each delegation!
 """
 
+
 root_agent = Agent(
     name="synthetic_data_fabricator",
     model=AGENT_MODEL,
@@ -296,3 +297,7 @@ root_agent = Agent(
     ],
     before_agent_callback=before_agent_callback,
 )
+
+# Export for deployment
+from vertexai import agent_engines
+app = agent_engines.AdkApp(agent=root_agent)
