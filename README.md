@@ -64,7 +64,7 @@ graph TB
 ### 1. Clone & Setup
 
 ```bash
-python -m venv .venv
+python3 -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
 ```
@@ -90,10 +90,11 @@ python run.py
 
 ```bash
 # Terminal 1: Start mock server
-python -m mock_sap_server.app
+python3 -m mock_sap_server.app
 
 # Terminal 2: Launch ADK web UI (best for HITL demos)
 adk web .
+#cd /Users/I771312/GoogleADK/synthetic-data-generator && .venv/bin/adk web .
 ```
 
 ### 5. View Results
